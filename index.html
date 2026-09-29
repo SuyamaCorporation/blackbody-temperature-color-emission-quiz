@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blackbody Temperature &amp; Color Emission Quiz</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .answer-btn { transition: background 0.15s, border-color 0.15s; }
+    .answer-btn.correct { background: rgba(34,197,94,0.2); border-color: #22c55e; color: #86efac; }
+    .answer-btn.wrong { background: rgba(239,68,68,0.15); border-color: #ef4444; color: #fca5a5; }
+    .answer-btn.reveal { background: rgba(34,197,94,0.1); border-color: #22c55e44; color: #86efac; }
+    .blackbody-swatch { width: 100%; height: 32px; border-radius: 8px; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+  <header class="bg-gray-900 border-b border-gray-800 px-4 py-4">
+    <div class="max-w-4xl mx-auto flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-orange-700 rounded-lg flex items-center justify-center text-xl" aria-hidden="true">🌡️</div>
+        <div>
+          <h1 class="text-xl font-bold text-white">Blackbody Radiation Quiz</h1>
+          <p class="text-sm text-gray-400">Wien's Law · Stefan-Boltzmann · Temperature-Color</p>
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="text-lg font-bold text-orange-300 font-mono"><span id="score">0</span>/<span id="total-q">0</span></div>
+        <div class="text-xs text-gray-500">Score</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-6" role="main">
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+      <!-- Left: Quiz -->
+      <div class="lg:col-span-3">
+        <!-- Mode Select -->
+        <div class="flex gap-2 mb-5 flex-wrap" role="group" aria-label="Quiz mode">
+          <button class="mode-btn active px-4 py-2 rounded-lg text-sm font-medium border border-orange-700 bg-orange-900/40 text-orange-200" data-mode="multiple" aria-pressed="true">Multiple Choice</button>
+          <button class="mode-btn px-4 py-2 rounded-lg text-sm font-medium border border-gray-700 text-gray-300 hover:border-orange-700 transition" data-mode="calculate" aria-pressed="false">Calculation</button>
+          <button class="mode-btn px-4 py-2 rounded-lg text-sm font-medium border border-gray-700 text-gray-300 hover:border-orange-700 transition" data-mode="color" aria-pressed="false">Color Match</button>
+        </div>
+
+        <!-- Question Area -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-4" id="question-area">
+          <div class="flex items-start gap-3 mb-4">
+            <span id="q-badge" class="text-xs bg-orange-900 text-orange-200 px-2.5 py-0.5 rounded-full font-medium flex-shrink-0">Q1</span>
+            <div id="q-topic" class="text-xs text-gray-500 pt-0.5"></div>
+          </div>
+          <div id="q-text" class="text-lg text-white leading-relaxed mb-6"></div>
+          <div id="q-formula" class="text-sm text-orange-300 font-mono bg-gray-800 rounded-lg px-4 py-2 mb-5 hidden"></div>
+          <div id="answers-area" class="space-y-2.5"></div>
+          <div id="feedback-area" class="mt-4 hidden">
+            <div id="feedback-text" class="text-sm p-4 rounded-lg leading-relaxed"></div>
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <button id="next-btn" class="flex-1 bg-orange-700 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition hidden" aria-label="Next question">Next Question →</button>
+          <button id="restart-btn" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-semibold transition hidden" aria-label="Restart quiz">Restart</button>
+        </div>
+
+        <!-- Progress Dots -->
+        <div class="flex gap-1.5 mt-4 flex-wrap" id="progress-dots" aria-label="Question progress"></div>
+      </div>
+
+      <!-- Right: Reference + Visualizer -->
+      <div class="lg:col-span-2 space-y-4">
+
+        <!-- Blackbody Color Visualizer -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <h2 class="text-sm font-semibold text-white mb-3">Blackbody Color Visualizer</h2>
+          <label for="temp-slider" class="text-xs text-gray-400">Temperature: <span id="temp-label" class="text-orange-300 font-mono">5778 K</span></label>
+          <input type="range" id="temp-slider" min="1000" max="40000" step="100" value="5778"
+            class="w-full mt-1 mb-3 accent-orange-500" aria-label="Temperature slider" />
+          <div id="color-swatch" class="blackbody-swatch mb-3" role="img" aria-label="Blackbody emission color"></div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="bg-gray-800 rounded p-2">
+              <div class="text-gray-500">Peak wavelength</div>
+              <div id="vis-peak" class="text-orange-300 font-mono font-bold">–</div>
+            </div>
+            <div class="bg-gray-800 rounded p-2">
+              <div class="text-gray-500">Peak color</div>
+              <div id="vis-color" class="text-orange-300 font-mono font-bold">–</div>
+            </div>
+            <div class="bg-gray-800 rounded p-2">
+              <div class="text-gray-500">Total power ∝</div>
+              <div id="vis-power" class="text-orange-300 font-mono font-bold">–</div>
+            </div>
+            <div class="bg-gray-800 rounded p-2">
+              <div class="text-gray-500">Star example</div>
+              <div id="vis-star" class="text-orange-300 font-mono font-bold">–</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Key Formulas -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <h2 class="text-sm font-semibold text-white mb-3">Key Laws</h2>
+          <div class="space-y-3 text-sm">
+            <div class="bg-gray-800 rounded-lg p-3">
+              <div class="text-orange-400 font-semibold mb-1">Wien's Displacement Law</div>
+              <div class="font-mono text-orange-200 text-base mb-1">λ_max = b / T</div>
+              <div class="text-gray-400 text-xs">b = 2.898×10⁻³ m·K (Wien constant)<br>T = temperature in Kelvin<br>λ_max = peak wavelength in meters</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-3">
+              <div class="text-orange-400 font-semibold mb-1">Stefan-Boltzmann Law</div>
+              <div class="font-mono text-orange-200 text-base mb-1">P = σ A T⁴</div>
+              <div class="text-gray-400 text-xs">σ = 5.67×10⁻⁸ W·m⁻²·K⁻⁴<br>A = surface area · ε (emissivity)<br>Power scales as T to the 4th power</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-3">
+              <div class="text-orange-400 font-semibold mb-1">Color-Temperature Guide</div>
+              <div class="text-gray-400 text-xs space-y-0.5">
+                <div>~1000 K — deep red glow</div>
+                <div>~3000 K — orange/warm white (incandescent)</div>
+                <div>~5778 K — yellow-white (Sun)</div>
+                <div>~10000 K — blue-white (A-type stars)</div>
+                <div>~30000 K+ — ultraviolet dominant</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const WIEN_B = 2.898e-3;
+    const SIGMA = 5.67e-8;
+
+    // Color approximation from temperature
+    function tempToRGB(T) {
+      let r, g, b;
+      if (T < 1000) T = 1000;
+      if (T > 40000) T = 40000;
+      const t = T / 100;
+      // Red
+      if (t <= 66) { r = 255; }
+      else { r = 329.698727446 * Math.pow(t - 60, -0.1332047592); r = Math.max(0, Math.min(255, r)); }
+      // Green
+      if (t <= 66) { g = 99.4708025861 * Math.log(t) - 161.1195681661; }
+      else { g = 288.1221695283 * Math.pow(t - 60, -0.0755148492); }
+      g = Math.max(0, Math.min(255, g));
+      // Blue
+      if (t >= 66) { b = 255; }
+      else if (t <= 19) { b = 0; }
+      else { b = 138.5177312231 * Math.log(t - 10) - 305.0447927307; b = Math.max(0, Math.min(255, b)); }
+      return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+    }
+
+    function peakWavelength(T) { return WIEN_B / T; }
+    function wavelengthToColor(nm) {
+      if (nm < 380) return 'UV (invisible)';
+      if (nm < 450) return 'Violet';
+      if (nm < 495) return 'Blue';
+      if (nm < 570) return 'Green';
+      if (nm < 590) return 'Yellow';
+      if (nm < 620) return 'Orange';
+      if (nm < 750) return 'Red';
+      return 'IR (invisible)';
+    }
+    function starExample(T) {
+      if (T < 3500) return 'M-type (cool red)';
+      if (T < 5000) return 'K-type (orange)';
+      if (T < 6000) return 'G-type (Sun ~5778K)';
+      if (T < 7500) return 'F-type (white-yellow)';
+      if (T < 10000) return 'A-type (Sirius ~9940K)';
+      if (T < 30000) return 'B-type (blue-white)';
+      return 'O-type (hot blue)';
+    }
+
+    // Update visualizer
+    const tempSlider = document.getElementById('temp-slider');
+    function updateVisualizer() {
+      const T = parseInt(tempSlider.value);
+      document.getElementById('temp-label').textContent = T.toLocaleString() + ' K';
+      document.getElementById('color-swatch').style.background = tempToRGB(T);
+      const lambda = peakWavelength(T);
+      const lambdaNm = (lambda * 1e9).toFixed(0);
+      document.getElementById('vis-peak').textContent = lambdaNm + ' nm';
+      document.getElementById('vis-color').textContent = wavelengthToColor(parseFloat(lambdaNm));
+      // Power relative to Sun
+      const relPower = Math.pow(T / 5778, 4);
+      document.getElementById('vis-power').textContent = relPower > 1000 ? (relPower/1000).toFixed(0) + '× (×10³)' : relPower.toFixed(2) + '× Sun';
+      document.getElementById('vis-star').textContent = starExample(T);
+    }
+    tempSlider.addEventListener('input', updateVisualizer);
+    updateVisualizer();
+
+    // Quiz questions
+    const QUESTIONS = [
+      {
+        mode: 'multiple',
+        topic: "Wien's Displacement Law",
+        text: "According to Wien's Displacement Law, if the temperature of a blackbody doubles, what happens to the peak emission wavelength?",
+        formula: 'λ_max = b / T',
+        options: ['It doubles', 'It halves', 'It increases by factor of 4', 'It remains the same'],
+        correct: 1,
+        explanation: "Wien's Law: λ_max = b/T. If T doubles, λ_max = b/(2T) = λ_old/2 — the peak wavelength halves, shifting toward shorter (bluer) wavelengths."
+      },
+      {
+        mode: 'multiple',
+        topic: "Stefan-Boltzmann Law",
+        text: "A star has twice the radius and twice the surface temperature of the Sun. By what factor is its total luminosity greater than the Sun's?",
+        formula: 'L = 4πR² · σT⁴',
+        options: ['8 times', '16 times', '64 times', '256 times'],
+        correct: 2,
+        explanation: "L ∝ R²T⁴. Factor = (2R)² × (2T)⁴ = 4R² × 16T⁴ = 64. The luminosity is 64 times greater. The T⁴ dependence makes temperature the dominant factor."
+      },
+      {
+        mode: 'multiple',
+        topic: "Color-Temperature Relationship",
+        text: "A star appears blue-white in colour. Its surface temperature is most likely:",
+        options: ['~3,500 K (cool red star)', '~5,778 K (like our Sun)', '~10,000 K (A-type star)', '~400 K (gas giant)'],
+        correct: 2,
+        explanation: "Blue-white stars are A-type stars with temperatures around 8,000–10,000 K. The peak wavelength falls in the blue part of the visible spectrum. Sirius (the brightest star) is ~9,940 K and appears blue-white."
+      },
+      {
+        mode: 'multiple',
+        topic: "Blackbody Spectrum",
+        text: "At what temperature does a blackbody's peak emission wavelength fall in the visible spectrum (~500 nm)?",
+        formula: 'λ_max = b / T, where b = 2.898×10⁻³ m·K',
+        options: ['~290 K', '~5,796 K', '~29,000 K', '~580 K'],
+        correct: 1,
+        explanation: "T = b/λ = 2.898×10⁻³ / 500×10⁻⁹ = 5,796 K ≈ 5,800 K. This is close to the Sun's surface temperature of ~5,778 K — which is why the Sun peaks in green-yellow visible light!"
+      },
+      {
+        mode: 'multiple',
+        topic: "Stefan-Boltzmann Power Scaling",
+        text: "If the temperature of a blackbody increases from 1,000 K to 3,000 K, by what factor does its total radiated power increase?",
+        formula: 'P ∝ T⁴',
+        options: ['3 times', '9 times', '27 times', '81 times'],
+        correct: 3,
+        explanation: "P ∝ T⁴. Factor = (3000/1000)⁴ = 3⁴ = 81. The T⁴ dependence means even modest temperature increases dramatically amplify radiated power."
+      },
+      {
+        mode: 'multiple',
+        topic: "Infrared vs Visible Emission",
+        text: "A human body at approximately 310 K emits primarily in which spectral range?",
+        formula: 'λ_max = b / T',
+        options: ['Visible light (400-700 nm)', 'Near-infrared (~1 μm)', 'Mid-infrared (~9.3 μm)', 'Microwave (~1 cm)'],
+        correct: 2,
+        explanation: "λ_max = 2.898×10⁻³ / 310 ≈ 9.35×10⁻⁶ m = 9.35 μm — mid-infrared. This is why thermal cameras detect human bodies at night. The human body is an excellent blackbody emitter in IR."
+      },
+      {
+        mode: 'multiple',
+        topic: "Planck's Law Concept",
+        text: "The blackbody radiation curve is characterised by:",
+        options: [
+          'A symmetric bell curve centred on the peak wavelength',
+          'An asymmetric curve rising steeply at short wavelengths and falling gradually at long wavelengths',
+          'A uniform spectrum at all wavelengths above the peak',
+          'An asymmetric curve falling steeply at short wavelengths and rising gradually at long wavelengths'
+        ],
+        correct: 1,
+        explanation: "The Planck blackbody curve rises sharply at short wavelengths (cut-off at high energies), peaks at λ_max, then falls off gradually (Rayleigh-Jeans tail) at long wavelengths. It's notably asymmetric — steeper on the short-wavelength side."
+      },
+      {
+        mode: 'multiple',
+        topic: "Stellar Classification",
+        text: "The star Betelgeuse appears distinctly orange-red. This tells us that compared to the Sun:",
+        options: [
+          'Betelgeuse is hotter and emits UV primarily',
+          'Betelgeuse is cooler, with peak emission shifted to longer wavelengths',
+          'Betelgeuse has the same temperature but a different composition',
+          'Betelgeuse emits mostly X-rays'
+        ],
+        correct: 1,
+        explanation: "Betelgeuse is an M-type red supergiant at ~3,500 K (vs Sun's 5,778 K). Its cooler temperature means λ_max shifts to longer wavelengths (redder). Wien's Law: cooler → longer peak wavelength → redder appearance."
+      },
+      {
+        mode: 'multiple',
+        topic: "Emissivity & Real Bodies",
+        text: "A 'greybody' differs from an ideal blackbody in that it:",
+        options: [
+          'Emits zero radiation at all wavelengths',
+          'Emits more radiation than a blackbody at the same temperature',
+          'Emits a constant fraction ε < 1 of blackbody radiation at each wavelength',
+          'Only emits at discrete spectral lines'
+        ],
+        correct: 2,
+        explanation: "A greybody has emissivity ε (0 < ε < 1), emitting ε × (blackbody intensity) uniformly across wavelengths. Real objects (like human skin ε≈0.97) are close to blackbodies. The Stefan-Boltzmann law becomes P = εσAT⁴."
+      },
+      {
+        mode: 'multiple',
+        topic: "Wien's Law Application",
+        text: "The cosmic microwave background (CMB) has a blackbody temperature of ~2.73 K. What is the approximate peak wavelength?",
+        formula: 'λ_max = b / T = 2.898×10⁻³ / T',
+        options: ['~1.06 mm (microwave)', '~500 nm (visible)', '~9.3 μm (mid-IR)', '~10 cm (radio)'],
+        correct: 0,
+        explanation: "λ_max = 2.898×10⁻³ / 2.73 ≈ 1.062×10⁻³ m = 1.062 mm — in the microwave band. This is the relic radiation from the Big Bang, redshifted over 13.8 billion years of cosmic expansion."
+      },
+    ];
+
+    let qIdx = 0;
+    let score = 0;
+    let answered = false;
+    let results = [];
+    let currentMode = 'multiple';
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === mode);
+        b.setAttribute('aria-pressed', b.dataset.mode === mode ? 'true' : 'false');
+      });
+      qIdx = 0; score = 0; answered = false; results = [];
+      updateScore();
+      buildDots();
+      loadQuestion();
+    }
+
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => setMode(btn.dataset.mode));
+    });
+
+    function loadQuestion() {
+      const qs = QUESTIONS.filter(q => q.mode === 'multiple' || currentMode === 'multiple');
+      if (qIdx >= qs.length) { showResults(qs); return; }
+      const q = qs[qIdx];
+      answered = false;
+      document.getElementById('q-badge').textContent = 'Q' + (qIdx + 1);
+      document.getElementById('q-topic').textContent = q.topic;
+      document.getElementById('q-text').textContent = q.text;
+      const fEl = document.getElementById('q-formula');
+      if (q.formula) { fEl.textContent = q.formula; fEl.classList.remove('hidden'); }
+      else fEl.classList.add('hidden');
+      const area = document.getElementById('answers-area');
+      area.innerHTML = '';
+      q.options.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'answer-btn w-full text-left bg-gray-800 border border-gray-700 text-gray-200 px-4 py-3 rounded-xl text-sm hover:border-orange-700 hover:bg-gray-750 transition';
+        btn.setAttribute('aria-label', 'Answer option ' + (i+1) + ': ' + opt);
+        const label = document.createElement('span');
+        label.className = 'text-gray-500 font-mono mr-2';
+        label.textContent = String.fromCharCode(65+i) + '.';
+        btn.appendChild(label);
+        const text = document.createElement('span');
+        text.textContent = opt;
+        btn.appendChild(text);
+        btn.addEventListener('click', () => selectAnswer(i, q, btn));
+        area.appendChild(btn);
+      });
+      document.getElementById('feedback-area').classList.add('hidden');
+      document.getElementById('next-btn').classList.add('hidden');
+      document.getElementById('restart-btn').classList.add('hidden');
+    }
+
+    function selectAnswer(idx, q, btn) {
+      if (answered) return;
+      answered = true;
+      const isCorrect = idx === q.correct;
+      if (isCorrect) { score++; results.push('correct'); }
+      else { results.push('wrong'); }
+      updateScore();
+
+      const btns = document.querySelectorAll('.answer-btn');
+      btns.forEach((b, i) => {
+        b.disabled = true;
+        if (i === q.correct) b.classList.add('reveal');
+        if (i === idx && !isCorrect) b.classList.add('wrong');
+        if (i === idx && isCorrect) b.classList.add('correct');
+      });
+
+      const fb = document.getElementById('feedback-area');
+      const fbText = document.getElementById('feedback-text');
+      fb.classList.remove('hidden');
+      fbText.className = 'text-sm p-4 rounded-lg leading-relaxed ' + (isCorrect ? 'bg-green-900/30 text-green-200 border border-green-700' : 'bg-red-900/20 text-red-200 border border-red-800');
+      fbText.textContent = (isCorrect ? '✓ Correct! ' : '✗ Incorrect. ') + q.explanation;
+
+      buildDots();
+
+      const qs = QUESTIONS.filter(q => q.mode === 'multiple' || currentMode === 'multiple');
+      if (qIdx < qs.length - 1) document.getElementById('next-btn').classList.remove('hidden');
+      else document.getElementById('restart-btn').classList.remove('hidden');
+    }
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+      qIdx++;
+      loadQuestion();
+    });
+
+    document.getElementById('restart-btn').addEventListener('click', () => {
+      qIdx = 0; score = 0; answered = false; results = [];
+      updateScore();
+      buildDots();
+      loadQuestion();
+    });
+
+    function updateScore() {
+      const qs = QUESTIONS;
+      document.getElementById('score').textContent = score;
+      document.getElementById('total-q').textContent = qs.length;
+    }
+
+    function buildDots() {
+      const dots = document.getElementById('progress-dots');
+      dots.innerHTML = '';
+      QUESTIONS.forEach((_, i) => {
+        const d = document.createElement('div');
+        const r = results[i];
+        d.className = 'w-2.5 h-2.5 rounded-full ' + (r === 'correct' ? 'bg-green-500' : r === 'wrong' ? 'bg-red-500' : i === qIdx ? 'bg-orange-400' : 'bg-gray-700');
+        d.setAttribute('aria-label', 'Question ' + (i+1) + ': ' + (r || 'unanswered'));
+        dots.appendChild(d);
+      });
+    }
+
+    function showResults(qs) {
+      const area = document.getElementById('question-area');
+      area.innerHTML = '';
+      const pct = Math.round(score / qs.length * 100);
+      const grade = pct >= 90 ? 'Excellent!' : pct >= 70 ? 'Good work!' : pct >= 50 ? 'Keep studying!' : 'Review the formulas!';
+      const msg = document.createElement('div');
+      msg.className = 'text-center py-8';
+      const title = document.createElement('div');
+      title.className = 'text-4xl mb-3';
+      title.textContent = pct >= 90 ? '🌟' : pct >= 70 ? '⭐' : '📚';
+      const h = document.createElement('h2');
+      h.className = 'text-2xl font-bold text-white mb-2';
+      h.textContent = grade;
+      const s = document.createElement('div');
+      s.className = 'text-5xl font-bold text-orange-300 font-mono mb-4';
+      s.textContent = score + '/' + qs.length;
+      const p = document.createElement('div');
+      p.className = 'text-gray-400';
+      p.textContent = pct + '% correct — ' + (pct >= 70 ? 'You have a solid grasp of blackbody radiation.' : 'Review Wien\'s Law and Stefan-Boltzmann Law using the formulas panel.');
+      msg.appendChild(title); msg.appendChild(h); msg.appendChild(s); msg.appendChild(p);
+      area.appendChild(msg);
+      document.getElementById('restart-btn').classList.remove('hidden');
+      document.getElementById('next-btn').classList.add('hidden');
+    }
+
+    updateScore();
+    buildDots();
+    loadQuestion();
+  </script>
+</body>
+</html>
